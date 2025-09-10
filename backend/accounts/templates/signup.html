@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOFA | Signup</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+</head>
+<body>
+  <section id="signup">
+    <div class="signup-container">
+      <div class="logoContainer">
+        <img src="{% static 'assets/MAIN-LOGO.png' %}" alt="Logo" />
+      </div>
+      <h2>Create Account</h2>
+      <form id="signupForm">
+        <input type="text" id="full_name" name="full_name" placeholder="Full Name" required />
+        <input type="text" id="user_name" name="user_name" placeholder="Username" required />
+        <input type="password" id="password" name="password" placeholder="Password" required />
+        <input type="email" id="email" name="email" placeholder="Email" required />
+        <input type="tel" id="phone-number" name="phone_number" placeholder="Phone Number" required />
+        <p><input type="checkbox" id="termsCheck" /> Agree with <a href="#">Terms & Conditions</a></p>
+        <button type="submit" id="create">Create</button>
+      </form>
+    </div>
+  </section>
+   <script>
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Get all required inputs
+            const fullName = document.getElementById('full_name');
+            const userName = document.getElementById('user_name');
+            const password = document.getElementById('password');
+            const email = document.getElementById('email');
+            const phoneNumber = document.getElementById('phone-number');
+            const termsCheck = document.getElementById('termsCheck');
+            
+            // Validate all fields and the checkbox
+            if (!fullName.value || !userName.value || !password.value || !email.value || !phoneNumber.value || !termsCheck.checked) {
+                alert('Please fill out all fields and agree to the terms and conditions.');
+                return;
+            }
+            
+            // Prepare data for API
+            const formData = {
+                full_name: fullName.value,
+                user_name: userName.value,
+                password: password.value,
+                email: email.value,
+                phone_number: phoneNumber.value
+            };
+            
+            try {
+                const response = await fetch('/api/signup/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Please verify your OTP!.');
+                    window.location.href = '{% url 'signup-verify' %}';
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error creating account. Please try again.');
+                console.error('Error:', error);
+            }
+        });
+
+
+
+      function setRealVH() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      }
+      window.addEventListener('resize', setRealVH);
+      window.addEventListener('load', setRealVH);
+  </script>
+</body>
+</html>
+
+
+
+
+

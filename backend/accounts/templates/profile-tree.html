@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Tree</title>
+    <style>
+        body { background: #eef4fb; }
+        .header { max-width: 1100px; margin: 20px auto; padding: 16px; border-radius: 14px; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.08); display:flex; gap:16px; }
+        .header img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #0a3d74; }
+        .meta { display:flex; flex-wrap: wrap; gap:8px; font-size: 14px; }
+        .name { font-weight: 700; font-size: 18px; color:#0a3d74; }
+        .graph-wrap { max-width: 1100px; margin: 10px auto 30px; border-radius: 14px; padding: 10px; }
+        #tree-svg { width: 100%; height: 70vh; }
+    </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="header" id="profileHeader">
+
+        <a href="{% url 'home' %}" style="text-decoration:none;color:#fff;padding:8px 12px;border-radius:8px "><img style="width: 20px; height: 20px;" src="{% static 'assets/left.png' %}" alt=""></a>
+        <div>
+            <img id="phImg" src="{% static 'assets/np.png' %}" alt="profile">
+            <div style="flex:1">
+                <div class="name" id="phName">Loading...</div>
+                <div class="meta">
+                    <div>Job: <span id="phJob">-</span></div>
+                    <div>Country: <span id="phCountry">-</span></div>
+                    <div>State: <span id="phState">-</span></div>
+                    <div>District: <span id="phDistrict">-</span></div>
+                </div>
+            </div>
+        </div>
+        <span></span>
+    </div>
+
+    <div class="graph-wrap">
+        <svg id="tree-svg"></svg>
+    </div>
+
+    <script>
+    (async function(){
+        const userId = {{ view_user_id }};
+        const res = await fetch(`/api/family-graph/?user_id=${userId}`);
+        const data = await res.json();
+        if (!data.success) { alert('Failed to load'); return; }
+
+        // Header fill from center node
+        const me = data.nodes.find(n => n.id === data.current_user_id) || data.nodes[0];
+        if (me) {
+            document.getElementById('phName').textContent = me.name;
+            document.getElementById('phJob').textContent = me.job || '-';
+            document.getElementById('phCountry').textContent = me.country || '-';
+            document.getElementById('phState').textContent = me.state || '-';
+            document.getElementById('phDistrict').textContent = me.district || '-';
+            document.getElementById('phImg').src = me.profile_image || "{% static 'assets/np.png' %}";
+        }
+
+        const svg = d3.select('#tree-svg');
+        const width = document.getElementById('tree-svg').clientWidth;
+        const height = document.getElementById('tree-svg').clientHeight;
+
+        const defs = svg.append('defs');
+        const fallback = '{% static 'assets/np.png' %}';
+        data.nodes.forEach(n => {
+            const url = n.profile_image || fallback;
+            const p = defs.append('pattern')
+                .attr('id', `pt-${n.id}`)
+                .attr('patternUnits', 'objectBoundingBox')
+                .attr('width', 1).attr('height', 1);
+            p.append('image').attr('href', url).attr('width', 100).attr('height', 100).attr('preserveAspectRatio', 'xMidYMid slice');
+        });
+
+        const link = svg.append('g').attr('stroke','#bbb').attr('stroke-opacity',.7)
+            .selectAll('line').data(data.links).enter().append('line').attr('stroke-width',2);
+        const node = svg.append('g').selectAll('g').data(data.nodes).enter().append('g');
+        node.append('circle').attr('r', d => d.is_me ? 22:18).attr('fill', d => `url(#pt-${d.id})`)
+            .attr('stroke', d=> d.is_me? '#0a3d74':'#6aa9ff').attr('stroke-width', d=> d.is_me?4:3);
+        node.append('text').attr('x',0).attr('y', d=> d.is_me?34:28).attr('text-anchor','middle').attr('font-size',12).text(d=>d.name);
+
+        const sim = d3.forceSimulation(data.nodes)
+            .force('link', d3.forceLink(data.links).id(d=>d.id).distance(120))
+            .force('charge', d3.forceManyBody().strength(-220))
+            .force('center', d3.forceCenter(width/2, height/2));
+        sim.on('tick', () => {
+            link.attr('x1', d=>d.source.x).attr('y1', d=>d.source.y)
+                .attr('x2', d=>d.target.x).attr('y2', d=>d.target.y);
+            node.attr('transform', d=>`translate(${d.x},${d.y})`);
+        });
+    })();
+
+
+    
+    </script>
+</body>
+</html>
+
+

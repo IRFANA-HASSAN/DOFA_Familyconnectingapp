@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DOFA | Signup Verify</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <script defer src="{% static 'js/verification.js' %}"></script>
+</head>
+<body>
+  <section id="otp-verification">
+    <div class="otp-container">
+      <h2>Verify</h2>
+      <p>Please enter the 4-digit verification code sent to your phone number</p>
+      <div class="otp-inputs">
+        <input type="text" inputmode="numeric" maxlength="1" pattern="\d*" />
+        <input type="text" inputmode="numeric" maxlength="1" pattern="\d*" />
+        <input type="text" inputmode="numeric" maxlength="1" pattern="\d*" />
+        <input type="text" inputmode="numeric" maxlength="1" pattern="\d*" />
+      </div>
+      <button id="otp-submit" type="button" onclick="validateOTP()">Submit</button>
+    </div>
+  </section>
+
+  <script>
+    const otpInputs = document.querySelectorAll('.otp-inputs input');
+
+    otpInputs.forEach((input, index) => {
+      input.addEventListener('input', () => {
+        if (input.value.length === 1 && index < otpInputs.length - 1) {
+          otpInputs[index + 1].focus();
+        }
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && input.value === '' && index > 0) {
+          otpInputs[index - 1].focus();
+        }
+      });
+    });
+
+    function validateOTP() {
+      let allFilled = true;
+      otpInputs.forEach(input => {
+        if (input.value.trim() === '') {
+          allFilled = false;
+        }
+      });
+
+      if (allFilled) {
+        window.location.href = '{% url "login-verify" %}';
+      } else {
+        alert('Please enter all 4 digits of the verification code.');
+      }
+    }
+  </script>
+</body>
+</html>

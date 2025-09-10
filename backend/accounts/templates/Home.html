@@ -1,0 +1,362 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        {% load static %}
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="{% static 'css/Home.css' %}">
+        <title>User Location Interface</title>
+        <style>
+           
+        </style>
+    </head>
+    <body>
+        <div class="background"></div>
+        <div class="dot-pattern"></div>
+        
+        <!-- Debug info -->
+        <!-- <div style="position: fixed; top: 10px; left: 10px; background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000; font-size: 12px;">
+            <p>Profile Image URL: {{ profile_image_url|default:"None" }}</p>
+            <p>User Name: {{ user_name }}</p>
+            <p>User Location: {{ user_location }}</p>
+            <p>User Object: {{ user.username }}</p>
+        </div> -->
+        
+        <div class="map-container">
+
+            <!-- Family graph container -->
+            <div id="family-graph" style="position:absolute; inset:0; pointer-events:none; align-items: center; justify-content: center;"></div>
+            <!-- Floating node popup placed near clicked node -->
+            <div id="node-popup" style="position:absolute; display:none; min-width:240px; background:#fff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:12px; z-index:12; pointer-events:auto;"></div>
+            <div class="navigation">
+                <ul>
+                    <li class="list active">
+                        <a href="{% url 'notification' %}">
+                            <span class="icon">
+                                <img src="{% static 'assets/notification.svg' %}" alt="">
+                            </span>
+                        </a>
+                    </li>
+                    <li class="list">
+                        <a href="{% url 'search' %}">
+                            <span class="icon">
+                                <img src="{% static 'assets/search.svg' %}" alt="">
+                            </span>
+                        </a>
+                    </li>
+                    <li class="list">
+                        <a href="{% url 'profile-page' %}">
+                            <span class="icon"><img src="{% static 'assets/profile.png' %}" alt=""></span>
+                        </a>
+                    </li>
+                    <div class="indicator"></div>
+                </ul>
+            </div>
+            
+            <div class="user-details" id="userDetails">
+                {% if profile_image_url %}
+                    <img src="{{ profile_image_url }}" alt="User Profile" id="userDetailPhoto" class="user-photo">
+                {% else %}
+                    <img src="{% static 'assets/np.png' %}" alt="User Profile" id="userDetailPhoto" class="user-photo">
+                {% endif %}
+                <div class="user-info">
+                    <h3 id="userDetailName">{{ user_name }}</h3>
+                    <p id="userDetailLocation">{{ user_location }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script>
+        // Hierarchical tree layout of accepted relations around current user
+        document.addEventListener('DOMContentLoaded', async function () {
+            try {
+                const res = await fetch('/api/family-graph/');
+                const data = await res.json();
+                if (!data.success) return;
+
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const svg = d3.select('#family-graph').append('svg')
+                    .attr('width', width)
+                    .attr('height', height)
+                    .style('pointer-events', 'auto');
+
+                // Pan & Zoom wrapper so nodes/links move together
+                const viewport = svg.append('g').attr('class', 'viewport');
+                svg.call(
+                    d3.zoom()
+                      .scaleExtent([0.5, 4])
+                      .on('zoom', (event) => {
+                          viewport.attr('transform', event.transform);
+                      })
+                );
+
+                const defaultAvatar = '{% static 'assets/np.png' %}';
+
+                // Image patterns so circles can be filled with profile photos
+                const defs = svg.append('defs');
+                data.nodes.forEach(n => {
+                    const url = n.profile_image || defaultAvatar;
+                    const p = defs.append('pattern')
+                        .attr('id', `node-img-${n.id}`)
+                        .attr('patternUnits', 'objectBoundingBox')
+                        .attr('width', 1)
+                        .attr('height', 1)
+                        .attr('x', 0)
+                        .attr('y', 0);
+                    p.append('image')
+                        .attr('href', url)
+                        .attr('width', 100)
+                        .attr('height', 100)
+                        .attr('preserveAspectRatio', 'xMidYMid slice');
+                });
+
+                // Build hierarchical tree from current user
+                const idToNode = new Map(data.nodes.map(n => [n.id, n]));
+                const childrenMap = new Map();
+                data.links.forEach(l => {
+                    const s = (l.source.id ?? l.source);
+                    const t = (l.target.id ?? l.target);
+                    if (!childrenMap.has(s)) childrenMap.set(s, []);
+                    childrenMap.get(s).push(t);
+                });
+                
+                function buildTree(id, visited = new Set()) {
+                    visited.add(id);
+                    const src = idToNode.get(id);
+                    const kids = (childrenMap.get(id) || [])
+                        .filter(cid => !visited.has(cid))
+                        .map(cid => buildTree(cid, visited));
+                    return { 
+                        id, 
+                        name: src?.name || '', 
+                        job: src?.job || '', 
+                        profile_image: src?.profile_image || null, 
+                        is_me: src?.is_me || false, 
+                        children: kids 
+                    };
+                }
+                
+                const rootData = buildTree(data.current_user_id);
+                const root = d3.hierarchy(rootData);
+                const treeLayout = d3.tree().size([height - 120, width - 200]).separation((a, b) => 0.5);
+                treeLayout(root);
+
+                // Smooth curved links using d3.linkVertical (bottom to top)
+                const linkGen = d3.linkVertical()
+                    .x(d => d.x + 100) // add left margin
+                    .y(d => height - 60 - d.y); // flip y to go from bottom to top
+
+                viewport.append('g')
+                    .attr('fill', 'none')
+                    .attr('stroke', '#9aa7b4')
+                    .attr('stroke-width', 2)
+                    .selectAll('path')
+                    .data(root.links())
+                    .enter().append('path')
+                    .attr('d', linkGen);
+
+                const node = viewport.append('g')
+                    .selectAll('g')
+                    .data(root.descendants())
+                    .enter().append('g')
+                    .attr('transform', d => `translate(${d.x + 100}, ${height - 60 - d.y})`);
+
+                node.append('circle')
+                    .attr('r', d => d.data.is_me ? 22 : 18)
+                    .attr('fill', d => `url(#node-img-${d.data.id})`)
+                    .attr('stroke', d => d.data.is_me ? '#0a3d74' : '#6aa9ff')
+                    .attr('stroke-width', d => d.data.is_me ? 4 : 3);
+
+                node.append('text')
+                    .attr('x', 0)
+                    .attr('y', d => d.data.is_me ? 34 : 28)
+                    .attr('text-anchor', 'middle')
+                    .attr('font-size', 12)
+                    .attr('fill', '#222')
+                    .text(d => d.data.name);
+
+                const popup = document.getElementById('node-popup');
+
+                function openPopup(evt, d) {
+                    // Find relation label relative to me if any
+                    const myId = data.current_user_id;
+                    let relLabel = '';
+                    for (const l of data.links) {
+                        if ((l.source.id ?? l.source) === myId && (l.target.id ?? l.target) === d.id) {
+                            relLabel = l.label;
+                            break;
+                        }
+                        if ((l.target.id ?? l.target) === myId && (l.source.id ?? l.source) === d.id) {
+                            // reverse might indicate opposite direction (e.g., Son)
+                            relLabel = l.label;
+                            break;
+                        }
+                    }
+                    const img = d.profile_image || '{% static 'assets/np.png' %}';
+                    popup.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <img src="${img}" alt="${d.name}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #0a3d74;">
+                            <div>
+                                <div style="font-weight:700;color:#0a3d74">${d.name}</div>
+                                <div style="font-size:12px;color:#666">${d.job || ''}</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:6px;font-size:12px;color:#0a3d74">${d.is_me ? 'You' : ''}</div>
+                        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;font-size:13px;color:#333">Relation: <span style="background:#e8f0ff;color:#0a3d74;padding:4px 8px;border-radius:12px;">${relLabel || '—'}</span></div>
+                        <div id="actionRow" style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end"></div>
+                    `;
+                    // Position near click (inside map container bounds)
+                    const container = document.querySelector('.map-container');
+                    const rect = container.getBoundingClientRect();
+                    const left = Math.min(Math.max(evt.clientX - rect.left + 12, 12), rect.width - 280);
+                    const top = Math.min(Math.max(evt.clientY - rect.top - 10, 12), rect.height - 180);
+                    popup.style.left = left + 'px';
+                    popup.style.top = top + 'px';
+                    popup.style.display = 'block';
+                    // Build action buttons based on relation status
+                    const actionRow = popup.querySelector('#actionRow');
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = 'Close';
+                    closeBtn.style.cssText = 'background:#0a3d74;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer';
+                    closeBtn.onclick = () => popup.style.display = 'none';
+                    const viewBtn = document.createElement('button');
+                    viewBtn.textContent = 'View';
+                    viewBtn.style.cssText = 'background:#4A90E2;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer';
+                    viewBtn.onclick = () => window.location.href = `/profile/${d.id}/tree/`;
+                    actionRow.appendChild(viewBtn);
+
+                    if (!d.is_me) {
+                        fetch(`/api/relation-status/?user_id=${d.id}`)
+                          .then(r=>r.json()).then(st=>{
+                            if (st.success) {
+                                if (st.related) {
+                                    const relatedBtn = document.createElement('button');
+                                    relatedBtn.textContent = 'Related';
+                                    relatedBtn.style.cssText = 'background:#e8f0ff;color:#0a3d74;border:none;border-radius:8px;padding:8px 12px;cursor:default';
+                                    actionRow.appendChild(relatedBtn);
+                                } else if (st.pending) {
+                                    const pendingBtn = document.createElement('button');
+                                    pendingBtn.textContent = 'Pending';
+                                    pendingBtn.style.cssText = 'background:#cfe0ff;color:#0a3d74;border:none;border-radius:8px;padding:8px 12px;cursor:pointer';
+                                    if (st.outgoing_id) {
+                                        pendingBtn.title = 'Click to withdraw your request';
+                                        pendingBtn.onclick = async () => {
+                                            try {
+                                                const res = await fetch('/api/relation-withdraw/', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                                                    body: JSON.stringify({ relationship_id: st.outgoing_id })
+                                                });
+                                                const rj = await res.json();
+                                                if (rj.success) { popup.style.display = 'none'; alert('Request withdrawn'); }
+                                                else { alert('Error: ' + rj.message); }
+                                            } catch(e){ alert('Error'); }
+                                        };
+                                    }
+                                    actionRow.appendChild(pendingBtn);
+                                } else {
+                                    const relateBtn = document.createElement('button');
+                                    relateBtn.textContent = 'Relate';
+                                    relateBtn.style.cssText = 'background:#2c7a2c;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer';
+                                    relateBtn.onclick = () => window.location.href = '{% url 'search' %}';
+                                    actionRow.appendChild(relateBtn);
+                                }
+                            }
+                            actionRow.appendChild(closeBtn);
+                          }).catch(()=>{ actionRow.appendChild(closeBtn); });
+                    } else {
+                        actionRow.appendChild(closeBtn);
+                    }
+                }
+                // Simple overlay to show another user's tree using the same renderer
+                function renderOverlayTree(treeData) {
+                    // create overlay
+                    const overlay = document.createElement('div');
+                    overlay.style.position = 'fixed';
+                    overlay.style.inset = '0';
+                    overlay.style.background = 'rgba(0,0,0,0.45)';
+                    overlay.style.zIndex = '20';
+                    const panel = document.createElement('div');
+                    panel.style.position = 'absolute';
+                    panel.style.top = '50%';
+                    panel.style.left = '50%';
+                    panel.style.transform = 'translate(-50%, -50%)';
+                    panel.style.background = '#fff';
+                    panel.style.width = '90%';
+                    panel.style.height = '80%';
+                    panel.style.borderRadius = '16px';
+                    panel.style.overflow = 'hidden';
+                    overlay.appendChild(panel);
+                    document.body.appendChild(overlay);
+
+                    const svg = d3.select(panel).append('svg')
+                        .attr('width', panel.clientWidth)
+                        .attr('height', panel.clientHeight);
+
+                    const defs = svg.append('defs');
+                    const fallback = '{% static 'assets/np.png' %}';
+                    treeData.nodes.forEach(n => {
+                        const url = n.profile_image || fallback;
+                        const p = defs.append('pattern')
+                            .attr('id', `ov-img-${n.id}`)
+                            .attr('patternUnits', 'objectBoundingBox')
+                            .attr('width', 1)
+                            .attr('height', 1);
+                        p.append('image')
+                            .attr('href', url)
+                            .attr('width', 100)
+                            .attr('height', 100)
+                            .attr('preserveAspectRatio', 'xMidYMid slice');
+                    });
+
+                    const link = svg.append('g')
+                        .attr('stroke', '#bbb').attr('stroke-opacity', .7)
+                        .selectAll('line').data(treeData.links).enter().append('line').attr('stroke-width', 2);
+
+                    const node = svg.append('g')
+                        .selectAll('g').data(treeData.nodes).enter().append('g')
+                        .call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
+
+                    node.append('circle').attr('r', d => d.is_me ? 22 : 18)
+                        .attr('fill', d => `url(#ov-img-${d.id})`)
+                        .attr('stroke', d => d.is_me ? '#0a3d74' : '#6aa9ff')
+                        .attr('stroke-width', d => d.is_me ? 4 : 3);
+                    node.append('text').attr('x', 0).attr('y', d => d.is_me ? 34 : 28)
+                        .attr('text-anchor', 'middle').attr('font-size', 12)
+                        .text(d => d.name);
+
+                    const sim = d3.forceSimulation(treeData.nodes)
+                        .force('link', d3.forceLink(treeData.links).id(d => d.id).distance(120))
+                        .force('charge', d3.forceManyBody().strength(-200))
+                        .force('center', d3.forceCenter(panel.clientWidth/2, panel.clientHeight/2));
+                    sim.on('tick', () => {
+                        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+                        node.attr('transform', d => `translate(${d.x},${d.y})`);
+                    });
+
+                    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+                }
+
+                node.on('click', (evt, d) => openPopup(evt, idToNode.get(d.data.id)));
+
+                // Tree layout doesn't need force simulation - positions are fixed
+                function dragstarted(event) {
+                    // No-op for tree layout
+                }
+                function dragged(event) {
+                    // No-op for tree layout
+                }
+                function dragended(event) {
+                    // No-op for tree layout
+                }
+            } catch (e) {
+                console.error('Graph load error', e);
+            }
+        });
+        </script>
+        <script src="{% static 'js/Home.js' %}"></script>
+    </body>
+    </html>

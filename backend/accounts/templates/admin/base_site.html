@@ -1,0 +1,30 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <img src="{% static 'assets/MAIN-LOGO.png' %}" alt="DOFA" style="height: 30px; margin-right: 10px;">
+        {{ site_header|default:_('Django administration') }}
+    </a>
+</h1>
+{% endblock %}
+
+{% block nav-global %}
+<div style="float: right; margin-top: 10px;">
+    {% if user.is_authenticated %}
+        <div style="display: flex; align-items: center; gap: 10px;">
+            {% if user.profile.profile_image %}
+                <img src="{{ user.profile.profile_image.url }}" alt="{{ user.username }}" 
+                     style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;">
+            {% else %}
+                <img src="{% static 'assets/np.png' %}" alt="Default" 
+                     style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;">
+            {% endif %}
+            <span style="color: white; font-weight: bold;">{{ user.first_name|default:user.username }}</span>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

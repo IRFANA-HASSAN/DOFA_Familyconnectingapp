@@ -1,0 +1,22 @@
+[
+    {
+        "name": "Rowan Vale",
+        "family": "The Aldridge Family",
+        "image": "/static/assets/profile1.jpg"
+    },
+    {
+        "name": "Isabelle Hayes",
+        "family": "The Sterling Group",
+        "image": "/static/assets/profile2.jpg"
+    },
+    {
+        "name": "Dax Monroe",
+        "family": "Thornewood Lineage",
+        "image": "/static/assets/profile4.jpg"
+    },
+    {
+        "name": "Victoria Shaw",
+        "family": "Beaumont Estates",
+        "image": "/static/assets/profile3.jpeg"
+    }
+]

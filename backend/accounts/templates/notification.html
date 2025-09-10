@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/notification.css' %}">
+    <title>Social Connection Interface</title>
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            <div class="tab" id="following-tab">Following</div>
+            <div class="tab" id="notification-tab">Notification</div>
+        </div>
+
+        <div class="content" id="following-content"></div>
+
+        <div class="content" id="notification-content"></div>
+    </div>
+
+    <div class="navigation">
+        <ul>
+            <li class="list active">
+                <a href="{% url 'home' %}">
+                    <span class="icon">
+                        <img src="{% static 'assets/home.svg' %}" alt="">
+                    </span>
+                </a>
+            </li>
+            <li class="list">
+                <a href="{% url 'search' %}">
+                    <span class="icon">
+                        <img src="{% static 'assets/search.svg' %}" alt="">
+                    </span>
+                </a>
+            </li>
+            <div class="indicator"></div>
+        </ul>
+    </div>
+    <script>
+        async function loadNotifications() {
+            const res = await fetch('/api/notifications/');
+            const data = await res.json();
+            const wrap = document.getElementById('notification-content');
+            wrap.innerHTML = '';
+            if (!data.success) {
+                wrap.innerHTML = '<p style="padding:16px;color:#666;">No notifications.</p>';
+                return;
+            }
+            data.notifications.forEach(n => {
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                const avatar = n.from_user.profile_image || '{% static 'assets/np.png' %}';
+                card.innerHTML = `
+                    <div class="avatar"><img src="${avatar}" alt="${n.from_user.name}"></div>
+                    <div class="user-info">
+                        <div class="user-name">${n.from_user.name} relate you as ${n.relationship_type}</div>
+                        <div class="user-house">Request</div>
+                    </div>
+                    <div class="buttons">
+                        <button class="btn btn-reject" data-id="${n.id}">Reject</button>
+                        <button class="btn btn-accept" data-id="${n.id}">Accept</button>
+                    </div>
+                `;
+                wrap.appendChild(card);
+            });
+
+            // Wire buttons
+            wrap.querySelectorAll('.btn-accept').forEach(b => b.onclick = () => respond(b.dataset.id, 'accept'));
+            wrap.querySelectorAll('.btn-reject').forEach(b => b.onclick = () => respond(b.dataset.id, 'reject'));
+        }
+
+        async function loadFollowingActivity() {
+            const res = await fetch('/api/activity/');
+            const data = await res.json();
+            const wrap = document.getElementById('following-content');
+            wrap.innerHTML = '';
+            if (!data.success || data.activity.length === 0) {
+                wrap.innerHTML = '<p style="padding:16px;color:#666;">No recent accepts.</p>';
+                return;
+            }
+            data.activity.forEach(a => {
+                const avatar = a.to_user.profile_image || '{% static 'assets/np.png' %}';
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                card.innerHTML = `
+                    <div class="avatar"><img src="${avatar}" alt="${a.to_user.name}"></div>
+                    <div class="user-info">
+                        <div class="user-name">${a.to_user.name} accepted as ${a.relation_label}</div>
+                        <div class="user-house">Accepted</div>
+                    </div>
+                `;
+                wrap.appendChild(card);
+            });
+        }
+
+        async function respond(relationshipId, action) {
+            const res = await fetch('/api/respond-relationship/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ relationship_id: relationshipId, action })
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert('Error: ' + data.message);
+                return;
+            }
+            // Reload both sections
+            await loadNotifications();
+            await loadFollowingActivity();
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            const followingTab = document.getElementById('following-tab');
+            const notificationTab = document.getElementById('notification-tab');
+            const followingContent = document.getElementById('following-content');
+            const notificationContent = document.getElementById('notification-content');
+
+            // Load data
+            await loadFollowingActivity();
+            await loadNotifications();
+
+            // Default tab
+            followingTab.classList.add('active');
+            followingContent.classList.add('active');
+
+            followingTab.addEventListener('click', function() {
+                followingTab.classList.add('active');
+                notificationTab.classList.remove('active');
+                followingContent.classList.add('active');
+                notificationContent.classList.remove('active');
+            });
+
+            notificationTab.addEventListener('click', function() {
+                notificationTab.classList.add('active');
+                followingTab.classList.remove('active');
+                notificationContent.classList.add('active');
+                followingContent.classList.remove('active');
+            });
+        });
+
+
+        function setRealVH() {
+            let vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        window.addEventListener('resize', setRealVH);
+        window.addEventListener('load', setRealVH);
+    </script>
+</body>
+</html>

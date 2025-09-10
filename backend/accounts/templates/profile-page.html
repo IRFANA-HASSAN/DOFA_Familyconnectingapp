@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - {{ user.first_name|default:user.username }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .time {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .status-icons {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .home-back-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+        .menu-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        .profile-container {
+            padding: 20px;
+            background: white;
+            margin: 10px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .profile-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .profile-pic-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        
+        .profile-pic {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #e0e0e0;
+        }
+        
+        .add-photo-btn {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 35px;
+            height: 35px;
+            background: #0a3D74;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .profile-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .profile-details {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .house-members {
+            margin: 20px 0;
+        }
+        
+        .house-members h4 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .members-list {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .member-pic {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .edit-profile-btn {
+            background: #0a3D74;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 20px 0;
+        }
+        
+        .posts-section {
+            background: white;
+            margin: 10px;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .post-icon {
+            font-size: 48px;
+            color: #ccc;
+            margin-bottom: 15px;
+        }
+        
+        .no-posts {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .post-now-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .settings-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .settings-menu {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 280px;
+            height: 100%;
+            background: white;
+            padding: 20px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .settings-menu.show {
+            transform: translateX(0);
+        }
+        
+        .settings-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            margin-right: 15px;
+        }
+        
+        .settings-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .settings-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+        
+        .settings-icon {
+            margin-right: 15px;
+            font-size: 18px;
+        }
+        
+        .logout-btn {
+            background: #0a3D74;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .edit-form-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1001;
+            display: none;
+        }
+        
+        .edit-form {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .form-section {
+            margin-bottom: 25px;
+        }
+        
+        .form-section h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        
+        .save-btn, .cancel-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .save-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .cancel-btn {
+            background: #f0f0f0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+
+        <button class="home-back-btn" onclick="gotohome()"><img src="{% static 'assets/left.png' %}" alt=""></button>
+        <button class="menu-btn" onclick="toggleSettings()">☰</button>
+    </div>
+
+    <!-- Profile Container -->
+    <div class="profile-container">
+        <div class="profile-section">
+            <div class="profile-pic-container">
+                {% if user.profile.profile_image %}
+                    <img src="{{ user.profile.profile_image.url }}" alt="Profile" class="profile-pic" id="profilePic">
+                {% else %}
+                    <img src="{% static 'assets/np.png' %}" alt="Profile" class="profile-pic" id="profilePic">
+                {% endif %}
+                <button class="add-photo-btn" onclick="changeProfilePic()">+</button>
+            </div>
+            
+            <div class="profile-name" id="profileName">
+                {{ user.first_name|default:user.username }} {{ user.last_name }}
+            </div>
+            
+            <div class="profile-details" id="profileDetails">
+                {% if user.profile.father_name or user.profile.mother_name %}
+                    {% if user.profile.father_name and user.profile.mother_name %}
+                        {{ user.profile.father_name }} & {{ user.profile.mother_name }} Family
+                    {% elif user.profile.father_name %}
+                        {{ user.profile.father_name }} Family
+                    {% else %}
+                        {{ user.profile.mother_name }} Family
+                    {% endif %}
+                {% endif %}
+                {% if user.profile.location %}
+                    , {{ user.profile.location }}
+                {% endif %}
+            </div>
+            
+            <div class="house-members">
+                <h4>House Members</h4>
+                <div class="members-list" id="houseMembers">
+                    <!-- Family members will be loaded here -->
+                </div>
+            </div>
+            
+            <button class="edit-profile-btn" onclick="openEditForm()">Edit Profile</button>
+        </div>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div class="settings-overlay" id="settingsOverlay" onclick="closeSettings()">
+        <div class="settings-menu" onclick="event.stopPropagation()">
+            <div class="settings-header">
+                <button class="back-btn" onclick="closeSettings()"><img src="{% static 'assets/left.png' %}" alt=""></button>
+                <div class="settings-title">Settings</div>
+            </div>
+            
+            <div class="settings-item" onclick="openEditForm()">
+                <span class="settings-icon"><img style="width: 20px; height: 20px;" src="{% static 'assets/edit.svg' %}" alt=""></span>
+                <span>Edit Profile</span>
+            </div>
+            
+            <button class="logout-btn" onclick="logout()">
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Edit Form Overlay -->
+    <div class="edit-form-overlay" id="editFormOverlay">
+        <div class="edit-form">
+            <div class="settings-header">
+                <button class="back-btn" onclick="closeEditForm()"><img src="{% static 'assets/left.png' %}" alt=""></button>
+                <div class="settings-title">Personal Information</div>
+            </div>
+            
+            <form id="editProfileForm">
+                <div class="form-section">
+                    <h3>Personal Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="firstName">First Name</label>
+                        <input type="text" id="firstName" name="first_name" value="{{ user.first_name }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lastName">Last Name</label>
+                        <input type="text" id="lastName" name="last_name" value="{{ user.last_name }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ user.email }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone_number" value="{{ user.profile.phone_number }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="dob">Date of Birth</label>
+                        <input type="date" id="dob" name="date_of_birth" value="{{ user.profile.date_of_birth|date:'Y-m-d' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="job">Job/Profession</label>
+                        <input type="text" id="job" name="job" value="{{ user.profile.job }}">
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>Family Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="fatherName">Father's Name</label>
+                        <input type="text" id="fatherName" name="father_name" value="{{ user.profile.father_name }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motherName">Mother's Name</label>
+                        <input type="text" id="motherName" name="mother_name" value="{{ user.profile.mother_name }}">
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>Location Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input type="text" id="country" name="country" value="{{ user.profile.country }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="state">State</label>
+                        <input type="text" id="state" name="state" value="{{ user.profile.state }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="district">District</label>
+                        <input type="text" id="district" name="district" value="{{ user.profile.district }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="location">Location/Address</label>
+                        <input type="text" id="location" name="location" value="{{ user.profile.location }}">
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeEditForm()">Cancel</button>
+                    <button type="submit" class="save-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleSettings() {
+            document.getElementById('settingsOverlay').style.display = 'block';
+            setTimeout(() => {
+                document.querySelector('.settings-menu').classList.add('show');
+            }, 10);
+        }
+        
+        function closeSettings() {
+            document.querySelector('.settings-menu').classList.remove('show');
+            setTimeout(() => {
+                document.getElementById('settingsOverlay').style.display = 'none';
+            }, 300);
+        }
+
+        function gotohome() {
+            window.location.href = '{% url "home" %}';
+        }
+        
+        function openEditForm() {
+            closeSettings();
+            document.getElementById('editFormOverlay').style.display = 'block';
+        }
+        
+        function closeEditForm() {
+            document.getElementById('editFormOverlay').style.display = 'none';
+        }
+        
+        function changeProfilePic() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('profilePic').src = e.target.result;
+                        // Here you would upload the image to the server
+                        uploadProfilePic(file);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            input.click();
+        }
+        
+        function uploadProfilePic(file) {
+            const formData = new FormData();
+            formData.append('profile_image', file);
+            
+            fetch('/api/update-profile-pic/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Profile picture updated successfully!');
+                } else {
+                    alert('Error updating profile picture: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error updating profile picture');
+                console.error('Error:', error);
+            });
+        }
+        
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '{% url "logout" %}';
+            }
+        }
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        // Handle form submission
+        document.getElementById('editProfileForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            fetch('/api/update-profile/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Profile updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error updating profile: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error updating profile');
+                console.error('Error:', error);
+            });
+        });
+        
+        // Load house members
+        function loadHouseMembers() {
+            fetch('/api/family-members/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const membersList = document.getElementById('houseMembers');
+                    membersList.innerHTML = '';
+                    
+                    data.members.forEach(member => {
+                        const memberDiv = document.createElement('div');
+                        memberDiv.innerHTML = `
+                            <img src="${member.profile_image || '{% static 'assets/np.png' %}'}" 
+                                 alt="${member.name}" 
+                                 class="member-pic"
+                                 title="${member.name}">
+                        `;
+                        membersList.appendChild(memberDiv);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error loading family members:', error);
+            });
+        }
+        
+        // Load house members on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadHouseMembers();
+        });
+    </script>
+</body>
+</html>
