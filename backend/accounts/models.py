@@ -1,8 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
+from django.utils import timezone
+import uuid
 
-# Create your models here.
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -33,11 +34,6 @@ class UserProfile(models.Model):
 
 
 class FamilyRelationship(models.Model):
-    """Stores directed family relationship requests and links.
-
-    from_user → to_user with a relationship_type. Optional middle_user and
-    free-form label can be stored for UI display.
-    """
 
     RELATIONSHIP_CHOICES = [
         ("father", "Father"),
@@ -67,10 +63,8 @@ class FamilyRelationship(models.Model):
     to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_relationships")
     relationship_type = models.CharField(max_length=30)
 
-    # Optional middle person in the chain (shown in the popup UI)
     middle_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="middle_relationships")
 
-    # Optional UI label (e.g., custom text shown in chips)
     relation_label = models.CharField(max_length=60, blank=True)
 
     message = models.TextField(blank=True)
@@ -87,3 +81,15 @@ class FamilyRelationship(models.Model):
 
     def __str__(self) -> str:
         return f"{self.from_user.username} → {self.to_user.username} ({self.relationship_type}, {self.status})"
+
+
+class PendingSignup(models.Model):
+    full_name = models.CharField(max_length=150)
+    username = models.CharField(max_length=150, unique=True)
+    password = models.CharField(max_length=128)  # store hashed password later
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=15, blank=True)
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(default=timezone.now)
+    is_verified = models.BooleanField(default=False)
+    token = models.UUIDField(default=uuid.uuid4, unique=True)

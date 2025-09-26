@@ -1,175 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DOFA</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <script defer src="{% static 'js/script.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
     <script src="{% static 'js/visitor.js' %}" defer></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@17/build/css/intlTelInput.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@17/build/js/intlTelInput.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@17/build/js/utils.js"></script>
-</head>
+    <style>
+        #message {
+            text-align: center;
+            font-size: 18px;
+            color: white;
+            flex: 0.85;
+        }
+    </style>
+  </head>
 
-<body>
+  <body>
     <!-- Splash Screen -->
     <section id="splash-screen">
-        <img src="{% static 'assets/LOGO-ICON.png' %}" alt="Logo-Image" class="image1" />
-        <img src="{% static 'assets/LOGO-LETTER-WOBG.png' %}" alt="Logo-Image" class="image2" />
+      <img
+        src="{% static 'assets/LOGO-ICON.png' %}"
+        alt="Logo-Image"
+        class="image1"
+      />
+      <img
+        src="{% static 'assets/LOGO-LETTER-WOBG.png' %}"
+        alt="Logo-Image"
+        class="image2"
+      />
     </section>
 
     <!-- Onboarding Screens -->
     <section id="onboard">
-        <div class="carousel-container">
-            <!-- Screen 1 -->
-            <div class="screen">
-                <div class="top">
-                    <h1>Embrace the world <br> with <b>DOFA</b></h1>
-                    <p>The top-rated app where the world unite...</p>
-                    <br>
-                    <div id="message"></div>
-                </div>
-                <div class="bottom">
-                    <div class="indicator-container">
-                        <div class="indicator" style="background-color: #0a3d74;"></div>
-                        <div class="indicator"></div>
-                    </div>
-                    <div class="next">
-                        <img src="{% static 'assets/Arrow - Right 2.svg' %}" alt="Next" onclick="gotocheck()" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- Screen 2: Phone Number Login -->
-            <!-- <div class="screen">
-                <div class="top">
-                    <h1>WELCOME TO <b>DOFA</b></h1>
-                    <p style="color: black;">Log in with your phone number</p>
-                    <form id="register-form" method="post" action="{% url 'login-verify' %}">
-                        {% csrf_token %}
-                        <input id="phone" type="tel" name="phone" required placeholder="Enter your phone number" />
-                        <button type="submit" id="submit">Send OTP</button>
-                    </form>
-                    <h6>Don't have an account? <a href="{% url 'signup-page' %}">Sign Up</a></h6>
-                    <h6>Already have an account? <a href="{% url 'login-verify' %}">Login</a></h6>
-                </div>
-                <div class="bottom">
-                    <div class="indicator-container">
-                        <div class="indicator"></div>
-                        <div class="indicator" style="background-color: #0a3d74;"></div>
-                    </div>
-                </div>
+      <div class="carousel-container">
+        <!-- Screen 1 -->
+        <div class="screen">
+          <div class="top">
+            <h1>
+              Embrace the world
+              with <b>DOFA</b>
+            </h1>
+            <p>The top-rated app where the world unite</p>
+            <br />
+          </div>
+          <div class="bottom">
+            <!-- <div class="indicator-container">
+              <div class="indicator" style="background-color: #0a3d74"></div>
+              <div class="indicator"></div>
             </div> -->
+            <p id="message"></p>
+            <div class="next" onclick="gotocheck()">
+              <img
+                src="{% static 'assets/Arrow - Right 2.svg' %}"
+                alt="Next"
+              />
+            </div>
+          </div>
         </div>
+
+      
+      </div>
     </section>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            setTimeout(function () {
-                document.getElementById("splash-screen").style.display = "none";
-                document.getElementById("onboard").style.display = "flex";
-            }, 2200);
+      document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(function () {
+          document.getElementById("splash-screen").style.display = "none";
+          document.getElementById("onboard").style.display = "flex";
+        }, 2200);
 
-            let currentSlide = 0;
-            const slides = document.querySelectorAll("#onboard .screen");
-            const carousel = document.querySelector(".carousel-container");
-            const nextButtons = document.querySelectorAll("#onboard .next");
+        let currentSlide = 0;
+        const slides = document.querySelectorAll("#onboard .screen");
+        const carousel = document.querySelector(".carousel-container");
+        const nextButtons = document.querySelectorAll("#onboard .next");
 
-            function updateCarousel() {
-                carousel.style.transform = `translateX(-${currentSlide * 50}%)`;
-            }
-
-            nextButtons.forEach(button => {
-                button.addEventListener("click", () => {
-                    if (currentSlide < slides.length - 1) {
-                        currentSlide++;
-                        updateCarousel();
-                    }
-                });
-            });
-            updateCarousel();
-        });
-
-        function gotocheck() {
-            window.location.href = '{% url "login-verify" %}';
+        function updateCarousel() {
+          carousel.style.transform = `translateX(-${currentSlide * 50}%)`;
         }
 
-        const input = document.querySelector("#phone");
-
-        const iti = window.intlTelInput(input, {
-            initialCountry: "auto",
-            geoIpLookup: function (success, failure) {
-                fetch("https://ipinfo.io/json?token=YOUR_TOKEN_HERE")
-                    .then(resp => resp.json())
-                    .then(resp => success(resp.country))
-                    .catch(() => success("us"));
-            },
-            utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@17/build/js/utils.js",
-        });
-
-
-        input.addEventListener("input", function () {
-            const selectedCountryData = iti.getSelectedCountryData();
-            const dialCode = selectedCountryData.dialCode;
-
-
-            const numberWithoutCode = input.value.replace("+" + dialCode, "").trim();
-
-
-            if (numberWithoutCode.length > 10) {
-                input.value = "+" + dialCode + " " + numberWithoutCode.slice(0, 10);
-            } else {
-                input.value = "+" + dialCode + " " + numberWithoutCode;
+        nextButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            if (currentSlide < slides.length - 1) {
+              currentSlide++;
+              updateCarousel();
             }
+          });
         });
+        updateCarousel();
+      });
 
+      function gotocheck() {
+        window.location.href = '{% url "authentication-page" %}';
+      }
 
-        input.addEventListener("countrychange", function () {
-            const selectedCountryData = iti.getSelectedCountryData();
-            const dialCode = selectedCountryData.dialCode;
-            input.value = "+" + dialCode + " ";
-        });
-
-
-        input.addEventListener("input", function () {
-            const value = input.value;
-            const selectedCountryData = iti.getSelectedCountryData();
-            const dialCode = selectedCountryData.dialCode;
-
-            if (!value) {
-                input.value = "+" + dialCode + " ";
-            }
-        });
-
-        document.getElementById("register-form").addEventListener("submit", function (e) {
-            const number = iti.getNumber().replace(/\D/g, ""); // just digits
-            const selectedCountry = iti.getSelectedCountryData();
-            const dialCode = selectedCountry.dialCode;
-
-            const userNumber = number.slice(dialCode.length); // number without dial code
-
-            if (!userNumber || userNumber.length < 10) {
-                e.preventDefault();
-                alert("Please fill the full phone number.");
-                return;
-            }
-
-            // If phone number ok, submit to login-verify page
-        });
-
-
-
-
-        function setRealVH() {
-            let vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        }
-        window.addEventListener('resize', setRealVH);
-        window.addEventListener('load', setRealVH);
+      function setRealVH() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty("--vh", `${vh}px`);
+      }
+      window.addEventListener("resize", setRealVH);
+      window.addEventListener("load", setRealVH);
     </script>
-</body>
-
+  </body>
 </html>

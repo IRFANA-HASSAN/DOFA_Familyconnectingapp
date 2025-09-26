@@ -2,18 +2,19 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.index_view, name='index'),
-    path('signup/', views.signup_page_view, name='signup-page'),
-    path('signup-verify/', views.signup_verify_view, name='signup-verify'),
-    path('login-verify/', views.login_verify, name='login-verify'),
-    path('home/', views.home, name='home'),
-    path('notification/', views.notification, name='notification'),
+    # page-view-urls
+    path('', views.home_page_view, name='home_page_view'),
+    path('authentication-page/', views.authentication_page_view, name='authentication-page'),
+    path('signup-page/', views.signup_verify_page_view, name='signup-page'),
     path('search/', views.search, name='search'),
+    path('notification/', views.notification, name='notification'),
     path('profile-setup/', views.profile_setup, name='profile-setup'),
     path('profile/<int:user_id>/tree/', views.profile_tree_view, name='profile-tree'),
+
+    # function view url
+    path('api/verify-signup/', views.verify_signup, name='verify-signup'),
+    path('home/', views.home, name='home'),
     path('logout/', views.logout_view, name='logout'),
-    
-    # API endpoints
     path('api/signup/', views.signup, name='signup'),
     path('api/login/', views.login_view, name='login'),
     path('api/profile-setup/', views.profile_setup_api, name='profile-setup-api'),

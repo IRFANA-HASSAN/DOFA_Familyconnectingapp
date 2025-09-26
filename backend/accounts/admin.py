@@ -4,9 +4,9 @@ from django.contrib.auth.models import User
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import UserProfile, FamilyRelationship
+from .models import UserProfile, FamilyRelationship,PendingSignup
 
-# Register your models here.
+admin.site.register(PendingSignup)
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile

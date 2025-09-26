@@ -11,24 +11,43 @@ from .models import UserProfile, FamilyRelationship
 from django.db import models
 import json
 import base64
+import random
+from django.core.mail import send_mail
+from .models import PendingSignup
+from django.contrib.auth.hashers import make_password
 
-# View for home page
-def index_view(request):
+
+#page views
+def home_page_view(request):
     return render(request, 'index.html')
 
-# View for signup form page
 def signup_page_view(request):
     return render(request, 'signup.html')
 
-# View for signup verify page
-def signup_verify_view(request):
+def signup_verify_page_view(request):
     return render(request, 'signup-verify.html')
 
-def login_verify(request):
-    return render(request, 'login-verify.html')
+def profile_setup(request):
+    return render(request, 'profile-setup.html')
+
+def authentication_page_view(request):
+    return render(request, 'authentication.html')
+
+def notification(request):
+    return render(request, 'notification.html')
+
+@login_required
+def search(request):
+    return render(request, 'search.html')
+
+def profile_tree_view(request, user_id: int):
+    return render(request, 'profile-tree.html', { 'view_user_id': user_id })
+
+
+
+#function views
 @login_required
 def home(request):
-    # Check if user has completed profile setup
     try:
         profile = request.user.profile
         if not profile.is_profile_complete:
@@ -36,7 +55,6 @@ def home(request):
     except UserProfile.DoesNotExist:
         return redirect('profile-setup')
     
-    # Get user profile data
     profile_image_url = None
     if request.user.profile.profile_image:
         try:
@@ -54,62 +72,101 @@ def home(request):
     
     return render(request, 'Home.html', context)
 
-def notification(request):
-    return render(request, 'notification.html')
+# @csrf_exempt
+# def signup(request):
+#     if request.method == 'POST':
+#         data = json.loads(request.body)
+#         username = data['user_name']
+#         email = data['email']
 
-@login_required
-def search(request):
-    return render(request, 'search.html')
+#         if User.objects.filter(username=username).exists() or PendingSignup.objects.filter(username=username).exists():
+#             return JsonResponse({'success': False, 'message': 'Username already exists'})
+#         if User.objects.filter(email=email).exists() or PendingSignup.objects.filter(email=email).exists():
+#             return JsonResponse({'success': False, 'message': 'Email already exists'})
 
+#         # Generate OTP
+#         otp = f"{random.randint(1000, 9999)}"
 
-def profile_setup(request):
-    return render(request, 'profile-setup.html')
+#         # Save pending signup
+#         pending_user = PendingSignup.objects.create(
+#             full_name=data['full_name'],
+#             username=username,
+#             password=make_password(data['password']),  # hash password
+#             email=email,
+#             phone_number=data.get('phone_number', ''),
+#             otp=otp
+#         )
 
+#         # Send email with OTP
+#         send_mail(
+#             subject='Verify your email',
+#             message=f'Your verification code is {otp}',
+#             from_email='lifecraft.dev@gmail.com',
+#             recipient_list=[email],
+#         )
 
-def profile_tree_view(request, user_id: int):
-    """Render a page that shows the selected user's header (photo + details)
-    and their family tree graph below (using /api/family-graph/?user_id=...).
-    """
-    return render(request, 'profile-tree.html', { 'view_user_id': user_id })
+#         return JsonResponse({'success': True, 'message': 'OTP sent to your email', 'token': str(pending_user.token)})
+#     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
-
-
-
-
-# API to handle signup POST request
 @csrf_exempt
 def signup(request):
     if request.method == 'POST':
         data = json.loads(request.body)
-        try:
-            # Check if username already exists
-            if User.objects.filter(username=data['user_name']).exists():
-                return JsonResponse({'success': False, 'message': 'Username already exists'})
-            
-            # Check if email already exists
-            if User.objects.filter(email=data['email']).exists():
-                return JsonResponse({'success': False, 'message': 'Email already exists'})
-            
-            # Create user
-            user = User.objects.create_user(
-                username=data['user_name'],
-                password=data['password'],
-                email=data['email']
-            )
-            user.first_name = data['full_name']
-            user.save()
-            
-            # Create user profile
-            UserProfile.objects.create(
-                user=user,
-                phone_number=data.get('phone_number', ''),
-            )
-            
-            return JsonResponse({'success': True, 'message': 'Account created successfully'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'message': str(e)})
+        username = data['user_name']
+        email = data['email']
+
+        if User.objects.filter(username=username).exists() or PendingSignup.objects.filter(username=username).exists():
+            return JsonResponse({'success': False, 'message': 'Username already exists'})
+        if User.objects.filter(email=email).exists() or PendingSignup.objects.filter(email=email).exists():
+            return JsonResponse({'success': False, 'message': 'Email already exists'})
+
+        otp = f"{random.randint(1000, 9999)}"
+
+        pending_user = PendingSignup.objects.create(
+            full_name=data['full_name'],
+            username=username,
+            password=make_password(data['password']),
+            email=email,
+            phone_number=data.get('phone_number', ''),
+            otp=otp
+        )
+
+        print(f"[DEBUG] OTP for {email} is {otp}")
+
+        return JsonResponse({'success': True, 'message': 'OTP generated', 'token': str(pending_user.token)})
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
+@csrf_exempt
+def verify_signup(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        token = data.get('token')
+        otp = data.get('otp')
+
+        try:
+            pending_user = PendingSignup.objects.get(token=token)
+        except PendingSignup.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Invalid token'})
+
+        if pending_user.otp != otp:
+            return JsonResponse({'success': False, 'message': 'Invalid OTP'})
+
+        user = User.objects.create(
+            username=pending_user.username,
+            email=pending_user.email,
+            first_name=pending_user.full_name,
+            password=pending_user.password,
+        )
+        UserProfile.objects.create(
+            user=user,
+            phone_number=pending_user.phone_number
+        )
+
+        pending_user.delete()
+
+        return JsonResponse({'success': True, 'message': 'Signup verified. You can now login.'})
+
+    return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
 @csrf_exempt
 def login_view(request):
@@ -144,31 +201,27 @@ def profile_setup_api(request):
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
         
         data = json.loads(request.body)
-        print(f"Received data: {data}")  # Debug print
+        print(f"Received data: {data}")
         try:
-            # Get the existing profile (should exist from signup)
             try:
                 profile = UserProfile.objects.get(user=request.user)
-                print(f"Found existing profile for user: {request.user.username}")  # Debug print
+                print(f"Found existing profile for user: {request.user.username}")
             except UserProfile.DoesNotExist:
-                # If profile doesn't exist, create one
                 profile = UserProfile.objects.create(user=request.user)
-                print(f"Created new profile for user: {request.user.username}")  # Debug print
+                print(f"Created new profile for user: {request.user.username}")
             
-            # Update user's first_name if provided
             if data.get('full_name'):
                 request.user.first_name = data.get('full_name')
                 request.user.save()
-                print(f"Updated user first_name to: {request.user.first_name}")  # Debug print
+                print(f"Updated user first_name to: {request.user.first_name}")
             
-            # Update profile fields
             date_of_birth = data.get('date_of_birth')
             if date_of_birth:
                 try:
                     from datetime import datetime
                     profile.date_of_birth = datetime.strptime(date_of_birth, '%Y-%m-%d').date()
                 except ValueError:
-                    print(f"Invalid date format: {date_of_birth}")  # Debug print
+                    print(f"Invalid date format: {date_of_birth}")
                     profile.date_of_birth = None
             else:
                 profile.date_of_birth = None
@@ -183,12 +236,11 @@ def profile_setup_api(request):
             profile.is_profile_complete = True
             
             print(f"Updated profile fields: DOB={profile.date_of_birth}, Father={profile.father_name}, Mother={profile.mother_name}, Job={profile.job}, Country={profile.country}")  # Debug print
-            
-            # Handle profile image if provided
+
             if data.get('profile_image'):
                 image_data = data['profile_image']
                 if image_data.startswith('data:image'):
-                    # Handle base64 image
+
                     format, imgstr = image_data.split(';base64,')
                     ext = format.split('/')[-1]
                     imgdata = base64.b64decode(imgstr)
@@ -210,7 +262,6 @@ def profile_setup_api(request):
 
 @csrf_exempt
 def get_users_api(request):
-    """API to fetch all users with their profiles for search page"""
     if request.method == 'GET':
         try:
             # Get all users with completed profiles
@@ -241,19 +292,12 @@ def get_users_api(request):
 
 @csrf_exempt
 def relate_user_api(request):
-    """API to handle family relationship requests
-
-    Accepts both the old payload and the popup payload:
-    - { target_user_id, relationship_type, message }
-    - { from_user_id, to_user_id, relation, label, middle_user_id }
-    """
     if request.method == 'POST':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
 
         data = json.loads(request.body)
 
-        # Support both payload styles
         from_user_id = data.get('from_user_id')
         to_user_id = data.get('to_user_id') or data.get('target_user_id')
         relationship_type = data.get('relation') or data.get('relationship_type')
@@ -261,15 +305,11 @@ def relate_user_api(request):
         middle_user_id = data.get('middle_user_id')
         message = data.get('message', '')
 
-        # Resolve users
         try:
             from_user = request.user if not from_user_id else User.objects.get(id=from_user_id)
             to_user = User.objects.get(id=to_user_id)
         except User.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'User not found'})
-
-        # Allow sending on behalf of any selected "from_user" (as requested).
-        # Target user must accept for it to become effective.
 
         if from_user == to_user:
             return JsonResponse({'success': False, 'message': 'You cannot relate to yourself'})
@@ -282,7 +322,6 @@ def relate_user_api(request):
                 except User.DoesNotExist:
                     middle_user = None
 
-            # Deduplicate pending/accepted of same type
             existing = FamilyRelationship.objects.filter(
                 from_user=from_user,
                 to_user=to_user,
@@ -314,7 +353,6 @@ def relate_user_api(request):
 
 @csrf_exempt
 def get_notifications_api(request):
-    """API to get pending relationship requests for the current user"""
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
@@ -347,14 +385,13 @@ def get_notifications_api(request):
 
 @csrf_exempt
 def respond_to_relationship_api(request):
-    """API to accept or reject relationship requests"""
     if request.method == 'POST':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
         
         data = json.loads(request.body)
         relationship_id = data.get('relationship_id')
-        action = data.get('action')  # 'accept' or 'reject'
+        action = data.get('action')
         
         try:
             relationship = FamilyRelationship.objects.get(
@@ -389,9 +426,6 @@ def respond_to_relationship_api(request):
 
 @csrf_exempt
 def get_activity_api(request):
-    """API: for the logged-in sender, list accepted relationship requests they sent.
-    Used to show messages like: "user2 accepted as Mother".
-    """
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
@@ -424,17 +458,11 @@ def get_activity_api(request):
 
 @csrf_exempt
 def get_family_graph_api(request):
-    """Return nodes and links for accepted relationships around the logged-in user.
-
-    nodes: { id, name, profile_image, is_me }
-    links: { source, target, type, label }
-    """
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
 
         try:
-            # Center user: default to current user, but allow querying another user's tree
             center_user = request.user
             q_user_id = request.GET.get('user_id')
             if q_user_id:
@@ -442,8 +470,6 @@ def get_family_graph_api(request):
                     center_user = User.objects.get(id=int(q_user_id))
                 except Exception:
                     center_user = request.user
-
-            # Step 1: direct (1-hop) accepted relations of center_user
             rels_1 = FamilyRelationship.objects.filter(
                 status='accepted'
             ).filter(
@@ -455,7 +481,6 @@ def get_family_graph_api(request):
                 one_hop_user_ids.add(r.from_user_id)
                 one_hop_user_ids.add(r.to_user_id)
 
-            # Step 2: also include relations among these one-hop users (their trees)
             rels_2 = FamilyRelationship.objects.filter(
                 status='accepted'
             ).filter(
@@ -507,9 +532,6 @@ def get_family_graph_api(request):
 
 @csrf_exempt
 def relation_status_api(request):
-    """Return relation status between current user and a target user.
-    { related: bool, pending: bool }
-    """
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
@@ -529,7 +551,6 @@ def relation_status_api(request):
                 status='pending'
             )
             pending = pending_qs.exists()
-            # Return id of my outgoing pending (for easy withdrawal)
             my_outgoing = FamilyRelationship.objects.filter(
                 from_user=request.user, to_user=target, status='pending'
             ).first()
@@ -564,7 +585,6 @@ def relation_withdraw_api(request):
 
 
 def profile_page(request):
-    """Profile page view"""
     if not request.user.is_authenticated:
         return redirect('login-verify')
     
@@ -575,13 +595,11 @@ def profile_page(request):
 
 @csrf_exempt
 def update_profile_api(request):
-    """API to update user profile information"""
     if request.method == 'POST':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
 
         try:
-            # Update User model fields
             if 'first_name' in request.POST:
                 request.user.first_name = request.POST['first_name']
             if 'last_name' in request.POST:
@@ -590,7 +608,6 @@ def update_profile_api(request):
                 request.user.email = request.POST['email']
             request.user.save()
 
-            # Update UserProfile fields
             profile, created = UserProfile.objects.get_or_create(user=request.user)
             
             if 'phone_number' in request.POST:
@@ -622,7 +639,6 @@ def update_profile_api(request):
 
 @csrf_exempt
 def update_profile_pic_api(request):
-    """API to update user profile picture"""
     if request.method == 'POST':
         if not request.user.is_authenticated:
             return JsonResponse({'success': False, 'message': 'User not authenticated'})
@@ -646,12 +662,10 @@ def update_profile_pic_api(request):
 
 
 def get_family_members_api(request):
-    """API to get family members for house members display"""
     if not request.user.is_authenticated:
         return JsonResponse({'success': False, 'message': 'User not authenticated'})
 
     try:
-        # Get accepted relationships where current user is involved
         relationships = FamilyRelationship.objects.filter(
             Q(from_user=request.user) | Q(to_user=request.user),
             status='accepted'
