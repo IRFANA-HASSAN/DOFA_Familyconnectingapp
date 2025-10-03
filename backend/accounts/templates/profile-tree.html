@@ -1,68 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Family Tree</title>
     <style>
-        body { background: #eef4fb; }
-        .header { max-width: 1100px; margin: 20px auto; padding: 16px; border-radius: 14px; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.08); display:flex; gap:16px; }
-        .header img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #0a3d74; }
-        .meta { display:flex; flex-wrap: wrap; gap:8px; font-size: 14px; }
-        .name { font-weight: 700; font-size: 18px; color:#0a3d74; }
-        .graph-wrap { max-width: 1100px; margin: 10px auto 30px; border-radius: 14px; padding: 10px; }
-        #tree-svg { width: 100%; height: 70vh; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #eef4fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow-x: hidden; }
+        
+        .top-bar { display: flex; align-items: center; padding: 16px; gap: 12px; }
+        .back-btn { background: none; border: none; cursor: pointer; padding: 8px; }
+        .back-btn img { width: 24px; height: 24px; }
+        .username { font-size: 18px; font-weight: 600; color: #0a3d74; }
+        
+        .profile-section { display: flex; align-items: center; gap: 16px; padding: 0 16px 16px; }
+        .profile-pic { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #0a3d74; }
+        .profile-info { flex: 1; }
+        .fullname { font-size: 18px; font-weight: 700; color: #0a3d74; margin-bottom: 4px; }
+        .family-name { font-size: 14px; color: #666; }
+        
+        .action-buttons { display: flex; gap: 12px; padding: 0 16px 20px; }
+        .btn { flex: 1; padding: 10px 20px; border: none; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-relate { background: #6B9DC6; color: white; }
+        .btn-relate:hover { background: #5688b5; }
+        .btn-relate:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-message { background: #6B9DC6; color: white; }
+        .btn-message:hover { background: #5688b5; }
+        .btn-message:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        .tree-container { 
+            width: 100%; 
+            height: calc(100vh - 220px); 
+            overflow: auto;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: white;
+        }
+        
+        #tree-svg { 
+            min-width: 800px; 
+            min-height: 600px;
+        }
+
+        /* Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { background: white; border-radius: 20px; width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); transform: scale(0.9); transition: transform 0.3s; }
+        .modal-overlay.active .modal { transform: scale(1); }
+        .modal-header { padding: 24px 24px 16px; text-align: center; position: relative; border-bottom: 1px solid #eee; }
+        .modal-close { position: absolute; top: 16px; right: 16px; background: #f5f5f5; color: #666; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; }
+        .modal-close:hover { background: #e0e0e0; }
+        .modal-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #333; }
+        .modal-subtitle { font-size: 14px; color: #666; margin-bottom: 16px; }
+        .from-user-section { padding: 20px 24px; border-bottom: 1px solid #eee; }
+        .from-user-label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; display: block; }
+        .custom-dropdown { position: relative; width: 100%; }
+        .dropdown-selected { display: flex; align-items: center; padding: 12px 40px 12px 12px; background: white; border: 2px solid #e0e0e0; border-radius: 12px; cursor: pointer; transition: all 0.2s; min-height: 56px; }
+        .dropdown-selected:hover { border-color: #4A90E2; }
+        .dropdown-selected.active { border-color: #4A90E2; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+        .from-user-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 12px; object-fit: cover; border: 2px solid #e0e0e0; }
+        .from-user-name { font-size: 15px; font-weight: 500; color: #333; flex: 1; }
+        .from-user-name.placeholder { color: #999; }
+        .dropdown-arrow { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #666; font-size: 12px; pointer-events: none; transition: transform 0.2s; }
+        .dropdown-arrow.active { transform: translateY(-50%) rotate(180deg); }
+        .dropdown-options { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid #4A90E2; border-top: none; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; max-height: 240px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+        .dropdown-options.active { display: block; }
+        .dropdown-option { display: flex; align-items: center; padding: 12px; cursor: pointer; transition: background 0.2s; }
+        .dropdown-option:hover { background: #f8f9fa; }
+        .option-avatar { width: 36px; height: 36px; border-radius: 50%; margin-right: 12px; object-fit: cover; border: 2px solid #e0e0e0; }
+        .option-name { font-size: 14px; color: #333; }
+        .relation-section { padding: 0 24px 20px; }
+        .relation-label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; display: block; }
+        .custom-select-wrapper { position: relative; z-index: 10; }
+        .custom-select { width: 100%; padding: 12px 40px 12px 16px; font-size: 15px; border: 2px solid #4A90E2; border-radius: 12px; background: white; color: #333; cursor: pointer; appearance: none; outline: none; transition: all 0.2s; }
+        .custom-select:hover { background: #f8f9ff; }
+        .custom-select:focus { border-color: #357abd; box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1); }
+        .select-arrow { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #4A90E2; font-size: 12px; }
+        .user-section { padding: 20px 24px; }
+        .user-card { display: flex; align-items: center; padding: 16px; background: #f8f9fa; border-radius: 12px; }
+        .to-user-card { background: #e3f2fd; }
+        .user-avatar { width: 50px; height: 50px; border-radius: 50%; margin-right: 16px; object-fit: cover; border: 3px solid white; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .user-info h4 { font-size: 16px; font-weight: 600; margin: 0 0 4px 0; color: #333; }
+        .user-info p { font-size: 12px; color: #666; margin: 0; }
+        .modal-actions { padding: 24px; display: flex; gap: 12px; border-top: 1px solid #eee; }
+        .modal-btn { flex: 1; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .modal-btn.primary { background: #4A90E2; color: white; }
+        .modal-btn.primary:hover { background: #357abd; }
+        .modal-btn.secondary { background: transparent; color: #666; border: 2px solid #e0e0e0; }
+        .modal-btn.secondary:hover { background: #f5f5f5; }
+
+        @media (max-width: 768px) {
+            .tree-container { height: calc(100vh - 200px); }
+            #tree-svg { min-width: 600px; min-height: 500px; }
+        }
     </style>
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-    <div class="header" id="profileHeader">
-
-        <a href="{% url 'home' %}" style="text-decoration:none;color:#fff;padding:8px 12px;border-radius:8px "><img style="width: 20px; height: 20px;" src="{% static 'assets/left.png' %}" alt=""></a>
-        <div>
-            <img id="phImg" src="{% static 'assets/np.png' %}" alt="profile">
-            <div style="flex:1">
-                <div class="name" id="phName">Loading...</div>
-                <div class="meta">
-                    <div>Job: <span id="phJob">-</span></div>
-                    <div>Country: <span id="phCountry">-</span></div>
-                    <div>State: <span id="phState">-</span></div>
-                    <div>District: <span id="phDistrict">-</span></div>
-                </div>
-            </div>
-        </div>
-        <span></span>
+    <div class="top-bar">
+        <button class="back-btn" onclick="goHome()">
+            <img src="/static/assets/left.png" alt="back">
+        </button>
+        <div class="username" id="usernameDisplay">username</div>
     </div>
 
-    <div class="graph-wrap">
+    <div class="profile-section">
+        <img id="profilePic" class="profile-pic" src="/assets/np.png" alt="profile">
+        <div class="profile-info">
+            <div class="fullname" id="fullName">Full Name</div>
+            <div class="family-name" id="familyName">Family Name</div>
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <button class="btn btn-relate" id="relateBtn" onclick="openRelateModal()">Relate</button>
+        <button class="btn btn-message" disabled title="Coming soon">Message</button>
+    </div>
+
+    <div class="tree-container" id="treeContainer">
         <svg id="tree-svg"></svg>
     </div>
 
+    <!-- Relationship Modal -->
+    <div class="modal-overlay" id="relationModal">
+        <div class="modal">
+            <div class="modal-header">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div class="modal-title">Add Relationship</div>
+                <div class="modal-subtitle">Select from user and relationship type</div>
+            </div>
+            
+            <div class="from-user-section">
+                <label class="from-user-label">From User</label>
+                <div class="custom-dropdown" id="fromUserDropdown">
+                    <div class="dropdown-selected" onclick="toggleFromUserDropdown()">
+                        <img id="selectedFromUserAvatar" class="from-user-avatar" src="/assets/np.png" alt="User" style="display: none;">
+                        <span id="selectedFromUserName" class="from-user-name placeholder">Select From User</span>
+                        <span class="dropdown-arrow" id="fromUserArrow">▼</span>
+                    </div>
+                    <div class="dropdown-options" id="fromUserOptions"></div>
+                </div>
+            </div>
+            
+            <div class="relation-section">
+                <label class="relation-label">Relationship Type</label>
+                <div class="custom-select-wrapper">
+                    <select class="custom-select" id="relationSelect">
+                        <option value="">Select Relation</option>
+                        <option value="mother">Mother</option>
+                        <option value="father">Father</option>
+                        <option value="son">Son</option>
+                        <option value="daughter">Daughter</option>
+                        <option value="brother">Brother</option>
+                        <option value="sister">Sister</option>
+                        <option value="friend">Friend</option>
+                        <option value="spouse">Spouse</option>
+                        <option value="cousin">Cousin</option>
+                        <option value="uncle">Uncle</option>
+                        <option value="aunt">Aunt</option>
+                        <option value="nephew">Nephew</option>
+                        <option value="niece">Niece</option>
+                    </select>
+                    <span class="select-arrow">▼</span>
+                </div>
+            </div>
+            
+            <div class="user-section">
+                <div class="user-card to-user-card">
+                    <img id="toUserAvatar" class="user-avatar" src="" alt="To User">
+                    <div class="user-info">
+                        <h4 id="toUserName">Selected User</h4>
+                        <p>To</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="closeModal()">Cancel</button>
+                <button class="modal-btn primary" onclick="confirmRelation()">Create Relation</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+    let profileUserData = null;
+    let allUsers = [];
+    let currentLoggedInUserId = null;
+    let selectedFromUser = null;
+
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('fromUserDropdown');
+        if (dropdown && !dropdown.contains(event.target)) {
+            closeFromUserDropdown();
+        }
+    });
+
     (async function(){
         const userId = {{ view_user_id }};
+        
+        const usersRes = await fetch("/api/users/");
+        const usersData = await usersRes.json();
+        if (usersData.success) {
+            allUsers = usersData.users;
+            currentLoggedInUserId = usersData.current_user_id;
+        }
+
         const res = await fetch(`/api/family-graph/?user_id=${userId}`);
         const data = await res.json();
         if (!data.success) { alert('Failed to load'); return; }
 
-        // Header fill from center node
         const me = data.nodes.find(n => n.id === data.current_user_id) || data.nodes[0];
+        profileUserData = me;
+        
         if (me) {
-            document.getElementById('phName').textContent = me.name;
-            document.getElementById('phJob').textContent = me.job || '-';
-            document.getElementById('phCountry').textContent = me.country || '-';
-            document.getElementById('phState').textContent = me.state || '-';
-            document.getElementById('phDistrict').textContent = me.district || '-';
-            document.getElementById('phImg').src = me.profile_image || "{% static 'assets/np.png' %}";
+            document.getElementById('usernameDisplay').textContent = me.username || 'username';
+            document.getElementById('fullName').textContent = me.name;
+            document.getElementById('familyName').textContent = me.family || 'Family Name';
+            document.getElementById('profilePic').src = me.profile_image || "/assets/np.png";
         }
 
+        checkRelationStatus(userId);
+
+        // D3 Tree with hierarchical layout
         const svg = d3.select('#tree-svg');
-        const width = document.getElementById('tree-svg').clientWidth;
-        const height = document.getElementById('tree-svg').clientHeight;
+        const svgWidth = 800;
+        const svgHeight = 600;
+        svg.attr('width', svgWidth).attr('height', svgHeight);
+
+        const g = svg.append('g');
 
         const defs = svg.append('defs');
-        const fallback = '{% static 'assets/np.png' %}';
+        const fallback = '/assets/np.png';
+        
+        // Create circular gradient patterns for profile images
         data.nodes.forEach(n => {
             const url = n.profile_image || fallback;
             const p = defs.append('pattern')
@@ -72,28 +245,307 @@
             p.append('image').attr('href', url).attr('width', 100).attr('height', 100).attr('preserveAspectRatio', 'xMidYMid slice');
         });
 
-        const link = svg.append('g').attr('stroke','#bbb').attr('stroke-opacity',.7)
-            .selectAll('line').data(data.links).enter().append('line').attr('stroke-width',2);
-        const node = svg.append('g').selectAll('g').data(data.nodes).enter().append('g');
-        node.append('circle').attr('r', d => d.is_me ? 22:18).attr('fill', d => `url(#pt-${d.id})`)
-            .attr('stroke', d=> d.is_me? '#0a3d74':'#6aa9ff').attr('stroke-width', d=> d.is_me?4:3);
-        node.append('text').attr('x',0).attr('y', d=> d.is_me?34:28).attr('text-anchor','middle').attr('font-size',12).text(d=>d.name);
-
-        const sim = d3.forceSimulation(data.nodes)
-            .force('link', d3.forceLink(data.links).id(d=>d.id).distance(120))
-            .force('charge', d3.forceManyBody().strength(-220))
-            .force('center', d3.forceCenter(width/2, height/2));
-        sim.on('tick', () => {
-            link.attr('x1', d=>d.source.x).attr('y1', d=>d.source.y)
-                .attr('x2', d=>d.target.x).attr('y2', d=>d.target.y);
-            node.attr('transform', d=>`translate(${d.x},${d.y})`);
+        // Build parent-child relationships from links
+        const nodeMap = {};
+        data.nodes.forEach(n => {
+            nodeMap[n.id] = { ...n, children: [] };
         });
+
+        // Find root (the user being viewed) and build tree structure
+        const rootNode = nodeMap[userId];
+        
+        data.links.forEach(link => {
+            const sourceId = link.source.id || link.source;
+            const targetId = link.target.id || link.target;
+            
+            if (nodeMap[sourceId] && nodeMap[targetId]) {
+                nodeMap[sourceId].children.push(nodeMap[targetId]);
+            }
+        });
+
+        // Create hierarchical layout
+        const treeLayout = d3.tree()
+            .size([svgWidth - 200, svgHeight - 200])
+            .separation((a, b) => a.parent === b.parent ? 1.2 : 1.5);
+
+        const root = d3.hierarchy(rootNode);
+        const treeData = treeLayout(root);
+
+        // Draw slightly curved paths
+        const link = g.append('g')
+            .selectAll('path')
+            .data(treeData.links())
+            .enter()
+            .append('path')
+            .attr('d', d => {
+                const sourceX = d.source.x + 100;
+                const sourceY = d.source.y + 100;
+                const targetX = d.target.x + 100;
+                const targetY = d.target.y + 100;
+                
+                // Create subtle curve using quadratic bezier
+                const midY = (sourceY + targetY) / 2;
+                
+                return `M${sourceX},${sourceY} Q${sourceX},${midY} ${targetX},${targetY}`;
+            })
+            .attr('fill', 'none')
+            .attr('stroke', '#c5d9e8')
+            .attr('stroke-width', 2);
+
+        // Draw nodes
+        const node = g.append('g')
+            .selectAll('g')
+            .data(treeData.descendants())
+            .enter()
+            .append('g')
+            .attr('transform', d => `translate(${d.x + 100},${d.y + 100})`);
+
+        // Add circles with profile images
+        node.append('circle')
+            .attr('r', d => d.data.is_me ? 35 : 30)
+            .attr('fill', d => `url(#pt-${d.data.id})`)
+            .attr('stroke', d => d.data.is_me ? '#6B9DC6' : '#c5d9e8')
+            .attr('stroke-width', d => d.data.is_me ? 4 : 3);
+        
+        // Add name labels below circles
+        node.append('text')
+            .attr('y', d => d.data.is_me ? 50 : 45)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', 13)
+            .attr('font-weight', 500)
+            .attr('fill', '#555')
+            .text(d => d.data.name);
     })();
 
+    async function checkRelationStatus(userId) {
+        try {
+            const response = await fetch(`/api/relation-status/?user_id=${userId}`);
+            const status = await response.json();
+            const button = document.getElementById('relateBtn');
+            
+            if (!button) return;
 
-    
+            if (status.success) {
+                if (status.related) {
+                    button.textContent = 'Related';
+                    button.disabled = true;
+                    button.style.opacity = '0.6';
+                } else if (status.pending) {
+                    button.textContent = 'Pending';
+                    button.style.background = '#ffc107';
+                    if (status.outgoing_id) {
+                        button.title = 'Click to withdraw your request';
+                        button.onclick = () => withdrawRequest(status.outgoing_id, userId);
+                    }
+                } else {
+                    button.textContent = 'Relate';
+                    button.onclick = openRelateModal;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking relation status:', error);
+        }
+    }
+
+    async function withdrawRequest(relationshipId, userId) {
+        if (!confirm('Are you sure you want to withdraw this relation request?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/relation-withdraw/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ relationship_id: relationshipId })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Request withdrawn successfully');
+                checkRelationStatus(userId);
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error withdrawing request:', error);
+            alert('Error withdrawing request. Please try again.');
+        }
+    }
+
+    function openRelateModal() {
+        if (!profileUserData) return;
+        
+        document.getElementById('toUserName').textContent = profileUserData.name;
+        document.getElementById('toUserAvatar').src = profileUserData.profile_image || '/assets/np.png';
+        document.getElementById('relationSelect').value = '';
+        
+        populateFromUserDropdown();
+        
+        const modal = document.getElementById('relationModal');
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function populateFromUserDropdown() {
+        const fromUserOptions = document.getElementById('fromUserOptions');
+        fromUserOptions.innerHTML = '';
+        
+        allUsers.forEach(user => {
+            if (user.id !== profileUserData.id) {
+                const imgSrc = user.profile_image && user.profile_image.trim() !== "" 
+                    ? user.profile_image 
+                    : "/assets/np.png";
+                
+                const option = document.createElement('div');
+                option.className = 'dropdown-option';
+                option.onclick = () => selectFromUser(user.id, user.name, imgSrc);
+                option.innerHTML = `
+                    <img src="${imgSrc}" alt="${user.name}" class="option-avatar">
+                    <span class="option-name">${user.name}</span>
+                `;
+                fromUserOptions.appendChild(option);
+                
+                if (user.id === currentLoggedInUserId) {
+                    selectFromUser(user.id, user.name, imgSrc);
+                }
+            }
+        });
+    }
+
+    function toggleFromUserDropdown() {
+        const options = document.getElementById('fromUserOptions');
+        const selected = document.querySelector('.dropdown-selected');
+        const arrow = document.getElementById('fromUserArrow');
+        
+        const isActive = options.classList.contains('active');
+        
+        if (isActive) {
+            options.classList.remove('active');
+            selected.classList.remove('active');
+            arrow.classList.remove('active');
+        } else {
+            options.classList.add('active');
+            selected.classList.add('active');
+            arrow.classList.add('active');
+        }
+    }
+
+    function closeFromUserDropdown() {
+        const options = document.getElementById('fromUserOptions');
+        const selected = document.querySelector('.dropdown-selected');
+        const arrow = document.getElementById('fromUserArrow');
+        
+        options.classList.remove('active');
+        selected.classList.remove('active');
+        arrow.classList.remove('active');
+    }
+
+    function selectFromUser(userId, userName, userImage) {
+        selectedFromUser = { id: userId, name: userName, image: userImage };
+        
+        const avatar = document.getElementById('selectedFromUserAvatar');
+        const name = document.getElementById('selectedFromUserName');
+        
+        avatar.src = userImage;
+        avatar.style.display = 'block';
+        name.textContent = userName;
+        name.classList.remove('placeholder');
+        
+        closeFromUserDropdown();
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('relationModal');
+        modal.classList.remove('active');
+        document.body.style.overflow = 'auto';
+        
+        selectedFromUser = null;
+        document.getElementById('relationSelect').value = '';
+        
+        const avatar = document.getElementById('selectedFromUserAvatar');
+        const name = document.getElementById('selectedFromUserName');
+        avatar.style.display = 'none';
+        avatar.src = '/assets/np.png';
+        name.textContent = 'Select From User';
+        name.classList.add('placeholder');
+        
+        closeFromUserDropdown();
+    }
+
+    async function confirmRelation() {
+        if (!selectedFromUser) {
+            alert('Please select a "From" user.');
+            return;
+        }
+
+        const relation = document.getElementById('relationSelect').value;
+        if (!relation) {
+            alert('Please select a relationship type.');
+            return;
+        }
+
+        if (!profileUserData) {
+            alert('Something went wrong. Please try again.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/relate/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    from_user_id: selectedFromUser.id,
+                    to_user_id: profileUserData.id,
+                    relation: relation
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`Successfully related ${selectedFromUser.name} as ${relation} to ${profileUserData.name}!`);
+                closeModal();
+                checkRelationStatus(profileUserData.id);
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error sending relation request. Please try again.');
+            console.error('Error:', error);
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function goHome() {
+        window.location.href = "/home/";
+    }
+
+    document.getElementById('relationModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
     </script>
 </body>
 </html>
-
-

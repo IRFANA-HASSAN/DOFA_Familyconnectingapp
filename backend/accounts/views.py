@@ -45,7 +45,32 @@ def profile_tree_view(request, user_id: int):
 
 
 
-#function views
+# #function views
+# @login_required
+# def home(request):
+#     try:
+#         profile = request.user.profile
+#         if not profile.is_profile_complete:
+#             return redirect('profile-setup')
+#     except UserProfile.DoesNotExist:
+#         return redirect('profile-setup')
+    
+#     profile_image_url = None
+#     if request.user.profile.profile_image:
+#         try:
+#             profile_image_url = request.user.profile.profile_image.url
+#         except Exception as e:
+#             print(f"Error getting profile image URL: {e}")
+    
+#     context = {
+#         'user': request.user,
+#         'profile': request.user.profile,
+#         'profile_image_url': profile_image_url,
+#         'user_name': request.user.first_name or request.user.username,
+#         'user_location': f"{request.user.profile.country}, {request.user.profile.state}" if request.user.profile.country and request.user.profile.state else "Location not set"
+#     }
+    
+#     return render(request, 'Home.html', context)
 @login_required
 def home(request):
     try:
@@ -67,7 +92,8 @@ def home(request):
         'profile': request.user.profile,
         'profile_image_url': profile_image_url,
         'user_name': request.user.first_name or request.user.username,
-        'user_location': f"{request.user.profile.country}, {request.user.profile.state}" if request.user.profile.country and request.user.profile.state else "Location not set"
+        'user_location': f"{request.user.profile.district}, {request.user.profile.state}".strip(', ') if request.user.profile.district or request.user.profile.state else "Location not set",
+        'current_user_id': request.user.id,  # Add this line
     }
     
     return render(request, 'Home.html', context)
@@ -260,11 +286,39 @@ def profile_setup_api(request):
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
+# @csrf_exempt
+# def get_users_api(request):
+#     if request.method == 'GET':
+#         try:
+#             # Get all users with completed profiles
+#             users_with_profiles = User.objects.filter(
+#                 profile__is_profile_complete=True
+#             ).select_related('profile')
+            
+#             users_data = []
+#             for user in users_with_profiles:
+#                 profile = user.profile
+#                 users_data.append({
+#                     'id': user.id,
+#                     'name': user.first_name or user.username,
+#                     'username': user.username,
+#                     'family': f"{profile.father_name} & {profile.mother_name}" if profile.father_name and profile.mother_name else "Family",
+#                     'profile_image': profile.profile_image.url if profile.profile_image else '',
+#                     'country': profile.country,
+#                     'state': profile.state,
+#                     'job': profile.job,
+#                     'phone_number': profile.phone_number
+#                 })
+            
+#             return JsonResponse({'success': True, 'users': users_data})
+#         except Exception as e:
+#             return JsonResponse({'success': False, 'message': str(e)})
+    
+#     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 @csrf_exempt
 def get_users_api(request):
     if request.method == 'GET':
         try:
-            # Get all users with completed profiles
             users_with_profiles = User.objects.filter(
                 profile__is_profile_complete=True
             ).select_related('profile')
@@ -284,7 +338,11 @@ def get_users_api(request):
                     'phone_number': profile.phone_number
                 })
             
-            return JsonResponse({'success': True, 'users': users_data})
+            return JsonResponse({
+                'success': True, 
+                'users': users_data,
+                'current_user_id': request.user.id  # Add this line
+            })
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)})
     
@@ -456,6 +514,79 @@ def get_activity_api(request):
 
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
+# @csrf_exempt
+# def get_family_graph_api(request):
+#     if request.method == 'GET':
+#         if not request.user.is_authenticated:
+#             return JsonResponse({'success': False, 'message': 'User not authenticated'})
+
+#         try:
+#             center_user = request.user
+#             q_user_id = request.GET.get('user_id')
+#             if q_user_id:
+#                 try:
+#                     center_user = User.objects.get(id=int(q_user_id))
+#                 except Exception:
+#                     center_user = request.user
+#             rels_1 = FamilyRelationship.objects.filter(
+#                 status='accepted'
+#             ).filter(
+#                 models.Q(from_user=center_user) | models.Q(to_user=center_user)
+#             ).select_related('from_user', 'to_user', 'from_user__profile', 'to_user__profile')
+
+#             one_hop_user_ids = {center_user.id}
+#             for r in rels_1:
+#                 one_hop_user_ids.add(r.from_user_id)
+#                 one_hop_user_ids.add(r.to_user_id)
+
+#             rels_2 = FamilyRelationship.objects.filter(
+#                 status='accepted'
+#             ).filter(
+#                 models.Q(from_user_id__in=one_hop_user_ids) | models.Q(to_user_id__in=one_hop_user_ids)
+#             ).select_related('from_user', 'to_user', 'from_user__profile', 'to_user__profile')
+
+#             rels = list(rels_2)
+
+#             user_ids = set()
+#             for r in rels:
+#                 user_ids.add(r.from_user_id)
+#                 user_ids.add(r.to_user_id)
+
+#             users = User.objects.filter(id__in=user_ids).select_related('profile')
+#             id_to_user = {u.id: u for u in users}
+
+#             nodes = []
+#             for uid in user_ids:
+#                 u = id_to_user.get(uid)
+#                 if not u:
+#                     continue
+#                 img = None
+#                 if hasattr(u, 'profile') and u.profile and u.profile.profile_image:
+#                     img = u.profile.profile_image.url
+#                 nodes.append({
+#                     'id': uid,
+#                     'name': u.first_name or u.username,
+#                     'job': getattr(getattr(u, 'profile', None), 'job', '') or '',
+#                     'country': getattr(getattr(u, 'profile', None), 'country', '') or '',
+#                     'state': getattr(getattr(u, 'profile', None), 'state', '') or '',
+#                     'profile_image': img,
+#                     'is_me': uid == center_user.id,
+#                 })
+
+#             links = []
+#             for r in rels:
+#                 links.append({
+#                     'source': r.from_user_id,
+#                     'target': r.to_user_id,
+#                     'type': r.relationship_type,
+#                     'label': r.relation_label or r.relationship_type,
+#                 })
+
+#             return JsonResponse({'success': True, 'current_user_id': center_user.id, 'nodes': nodes, 'links': links})
+#         except Exception as e:
+#             return JsonResponse({'success': False, 'message': str(e)})
+
+#     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 @csrf_exempt
 def get_family_graph_api(request):
     if request.method == 'GET':
@@ -470,6 +601,7 @@ def get_family_graph_api(request):
                     center_user = User.objects.get(id=int(q_user_id))
                 except Exception:
                     center_user = request.user
+            
             rels_1 = FamilyRelationship.objects.filter(
                 status='accepted'
             ).filter(
@@ -489,7 +621,8 @@ def get_family_graph_api(request):
 
             rels = list(rels_2)
 
-            user_ids = set()
+            # IMPORTANT: Always include center user even if no relations
+            user_ids = {center_user.id}
             for r in rels:
                 user_ids.add(r.from_user_id)
                 user_ids.add(r.to_user_id)
@@ -502,16 +635,34 @@ def get_family_graph_api(request):
                 u = id_to_user.get(uid)
                 if not u:
                     continue
+                
+                profile = getattr(u, 'profile', None)
                 img = None
-                if hasattr(u, 'profile') and u.profile and u.profile.profile_image:
-                    img = u.profile.profile_image.url
+                if profile and profile.profile_image:
+                    img = profile.profile_image.url
+                
+                location_parts = []
+                if profile:
+                    if profile.location:
+                        location_parts.append(profile.location)
+                    if profile.district:
+                        location_parts.append(profile.district)
+                    if profile.state:
+                        location_parts.append(profile.state)
+                    if profile.country:
+                        location_parts.append(profile.country)
+                
+                location_str = ', '.join(location_parts) if location_parts else 'Location not set'
+                
                 nodes.append({
                     'id': uid,
                     'name': u.first_name or u.username,
-                    'job': getattr(getattr(u, 'profile', None), 'job', '') or '',
-                    'country': getattr(getattr(u, 'profile', None), 'country', '') or '',
-                    'state': getattr(getattr(u, 'profile', None), 'state', '') or '',
-                    'profile_image': img,
+                    'username': u.username,
+                    'job': getattr(profile, 'job', '') or '',
+                    'country': getattr(profile, 'country', '') or '',
+                    'state': getattr(profile, 'state', '') or '',
+                    'location': location_str,
+                    'profile_image': img,  # This will be None if no image, or the URL
                     'is_me': uid == center_user.id,
                 })
 
@@ -524,11 +675,21 @@ def get_family_graph_api(request):
                     'label': r.relation_label or r.relationship_type,
                 })
 
-            return JsonResponse({'success': True, 'current_user_id': center_user.id, 'nodes': nodes, 'links': links})
+            return JsonResponse({
+                'success': True, 
+                'current_user_id': center_user.id, 
+                'nodes': nodes, 
+                'links': links
+            })
         except Exception as e:
+            import traceback
+            print(f"Error in get_family_graph_api: {e}")
+            print(traceback.format_exc())
             return JsonResponse({'success': False, 'message': str(e)})
 
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
+
+
 
 @csrf_exempt
 def relation_status_api(request):

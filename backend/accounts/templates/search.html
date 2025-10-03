@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -163,7 +165,7 @@
         }
 
         .relate-btn.related:hover {
-            background: #28a745;
+            background: #85b5fc;
             transform: none;
         }
 
@@ -548,7 +550,7 @@
             <div class="user-section">
                 <div class="from-user-container">
                     <div class="user-card clickable" id="fromUserCard" onclick="openSearchPanel()">
-                        <img id="fromUserAvatar" class="user-avatar" src="" alt="From User">
+                        <img id="fromUserAvatar" class="user-avatar" src="{% static 'assets/np.png' %}" alt="From User">
                         <div class="user-info">
                             <h4 id="fromUserName">Select User</h4>
                             <p>From</p>
@@ -611,6 +613,7 @@
 
     <script>
         let allUsers = [];
+        let currentLoggedInUserId = null;  // ADD THIS LINE
         let selectedUser = null;
         let fromUser = null;
         let toUser = null;
@@ -625,10 +628,14 @@
                 .then(data => {
                     if (data.success) {
                         allUsers = data.users;
-                        renderContacts(data.users);
+                        currentLoggedInUserId = data.current_user_id;  // ADD THIS LINE
+                        
+                        // Filter out logged in user from the contact list - ADD THESE LINES
+                        const filteredUsers = allUsers.filter(user => user.id !== currentLoggedInUserId);
+                        renderContacts(filteredUsers);
 
                         searchInput.addEventListener('input', (e) => {
-                            filterContacts(data.users, e.target.value);
+                            filterContacts(filteredUsers, e.target.value);  // CHANGE THIS
                         });
 
                         searchFromUser.addEventListener('input', (e) => {
@@ -638,7 +645,7 @@
                         const backButton = document.querySelector('.back-button');
                         backButton.addEventListener('click', () => {
                             searchInput.value = '';
-                            renderContacts(data.users);
+                            renderContacts(filteredUsers);  // CHANGE THIS
                         });
                     } else {
                         console.error("Error fetching users:", data.message);
@@ -666,7 +673,7 @@
             contacts.forEach(contact => {
                 const imgSrc = contact.profile_image && contact.profile_image.trim() !== "" 
                     ? contact.profile_image 
-                    : "/assets/np.png";
+                    : "{% static 'assets/np.png' %}";
 
                 const contactElement = document.createElement('div');
                 contactElement.className = 'contact-item';
@@ -692,7 +699,6 @@
         }
 
         function handleRelateButton(event, userId, userName, userImage) {
-            // Stop event propagation to prevent the contact item click
             event.stopPropagation();
             openRelationModal(userId, userName, userImage);
         }
@@ -709,7 +715,7 @@
                     if (status.related) {
                         button.textContent = 'Related';
                         button.className = 'relate-btn related';
-                        button.onclick = (event) => event.stopPropagation(); // Just stop propagation, don't open modal
+                        button.onclick = (event) => event.stopPropagation();
                     } else if (status.pending) {
                         button.textContent = 'Pending';
                         button.className = 'relate-btn pending';
@@ -720,7 +726,7 @@
                                 withdrawRequest(status.outgoing_id, userId);
                             };
                         } else {
-                            button.onclick = (event) => event.stopPropagation(); // Incoming request, non-clickable
+                            button.onclick = (event) => event.stopPropagation();
                         }
                     } else {
                         button.textContent = 'Relate';
@@ -752,10 +758,14 @@
             const user = allUsers.find(u => u.id === userId);
             return user && user.profile_image && user.profile_image.trim() !== "" 
                 ? user.profile_image 
-                : "/assets/np.png";
+                : "{% static 'assets/np.png' %}";
         }
 
         async function withdrawRequest(relationshipId, userId) {
+            if (!confirm('Are you sure you want to withdraw this relation request?')) {
+                return;
+            }
+
             try {
                 const response = await fetch('/api/relation-withdraw/', {
                     method: 'POST',
@@ -770,7 +780,6 @@
                 
                 if (result.success) {
                     alert('Request withdrawn successfully');
-                    // Refresh the button status
                     checkRelationStatus(userId);
                 } else {
                     alert('Error: ' + result.message);
@@ -799,23 +808,18 @@
         function openRelationModal(userId, userName, userImage) {
             selectedUser = { id: userId, name: userName, image: userImage };
             
-            // Set the "To" user (the clicked user)
             toUser = selectedUser;
             document.getElementById('toUserName').textContent = userName;
             document.getElementById('toUserAvatar').src = userImage;
             
-            // Reset "From" user selection
             fromUser = null;
             document.getElementById('fromUserName').textContent = 'Select User';
-            document.getElementById('fromUserAvatar').src = '';
+            document.getElementById('fromUserAvatar').src = "{% static 'assets/np.png' %}";
             
-            // Reset relation selection
             document.getElementById('relationSelect').value = '';
             
-            // Populate search panel with all users except the selected one
             renderSearchPanel(allUsers);
             
-            // Show modal
             const modal = document.getElementById('relationModal');
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -826,7 +830,6 @@
             modal.classList.remove('active');
             document.body.style.overflow = 'auto';
             
-            // Reset selections
             selectedUser = null;
             fromUser = null;
             toUser = null;
@@ -849,13 +852,12 @@
             const searchResults = document.getElementById('searchResults');
             searchResults.innerHTML = '';
 
-            // Filter out the "To" user from the search results
             const availableUsers = users.filter(user => user.id !== toUser.id);
 
             availableUsers.forEach(user => {
                 const imgSrc = user.profile_image && user.profile_image.trim() !== "" 
                     ? user.profile_image 
-                    : "/assets/np.png";
+                    : "{% static 'assets/np.png' %}";
 
                 const userElement = document.createElement('div');
                 userElement.className = 'search-user-item';
@@ -886,11 +888,9 @@
         function selectFromUser(userId, userName, userImage) {
             fromUser = { id: userId, name: userName, image: userImage };
             
-            // Update "From" user display
             document.getElementById('fromUserName').textContent = userName;
             document.getElementById('fromUserAvatar').src = userImage;
             
-            // Close search panel
             closeSearchPanel();
         }
 
@@ -925,7 +925,6 @@
                 if (result.success) {
                     alert(`Successfully related ${fromUser.name} as ${relation} to ${toUser.name}!`);
                     closeModal();
-                    // Refresh the button status for the related user
                     checkRelationStatus(toUser.id);
                 } else {
                     alert('Error: ' + result.message);
@@ -936,7 +935,6 @@
             }
         }
 
-        // Function to get CSRF token from cookies
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -953,7 +951,6 @@
         }
 
         function goHome() {
-            // Replace with your actual home URL
             window.location.href = "/home/";
         }
 
@@ -965,7 +962,6 @@
         window.addEventListener('resize', setRealVH);
         window.addEventListener('load', setRealVH);
 
-        // Close modal when clicking outside
         document.getElementById('relationModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeModal();
